@@ -109,8 +109,8 @@ Input (file: alerts.json) → Filter (date) → Output (OpenSearch + stdout)
 
 1. Клонируем репозиторий
 
-git clone https://github.com/kanabicks/wazuh-ebpf-kks.git
-cd wazuh-ebpf-ctf
+git clone [https://github.com/kanabicks/wazuh-ebpf-kks.git](https://github.com/kanabicks/kks-wazuh-siem)
+cd kks-wazuh-siem
 2. Делаем скрипт исполняемым и запускаем
 
 chmod +x setup.sh
