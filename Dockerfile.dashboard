@@ -1,19 +1,20 @@
 FROM wazuh/wazuh-dashboard:4.9.0
+
 USER root
 
-# Удаляем плагины безопасности
-RUN rm -rf /usr/share/wazuh-dashboard/plugins/opensearch-security
-RUN rm -rf /usr/share/wazuh-dashboard/plugins/securityDashboards
+# Create default Wazuh API configuration
+RUN mkdir -p /usr/share/wazuh-dashboard/data/wazuh/config && \
+    cat > /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml << 'EOF' && \
+hosts:
+  - default:
+      url: https://wazuh.manager
+      port: 55000
+      username: wazuh-wui
+      password: wazuh-wui
+      run_as: false
+EOF
+    chown -R wazuh-dashboard:wazuh-dashboard /usr/share/wazuh-dashboard/data
 
-# Конфиг OpenSearch Dashboards
-RUN echo "server.host: 0.0.0.0" > /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "server.port: 5601" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "opensearch.hosts:" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "  - http://wazuh.indexer:9200" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "opensearch.ssl.verificationMode: none" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "opensearch.requestHeadersAllowlist:" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "  - authorization" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    echo "  - securitytenant" >> /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml && \
-    chown -R 1000:1000 /usr/share/wazuh-dashboard/config/
+USER wazuh-dashboard
 
-USER 1000
+CMD ["/entrypoint.sh"]
