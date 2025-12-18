@@ -1,0 +1,7 @@
+FROM wazuh/wazuh-indexer:4.9.0
+USER root
+# Удаляем плагин безопасности физически
+RUN rm -rf /usr/share/wazuh-indexer/plugins/opensearch-security
+# Прописываем конфиг (БЕЗ plugins.security.disabled)
+RUN echo "network.host: 0.0.0.0" > /usr/share/wazuh-indexer/opensearch.yml &&     echo "discovery.type: single-node" >> /usr/share/wazuh-indexer/opensearch.yml &&     echo "cluster.routing.allocation.disk.threshold_enabled: false" >> /usr/share/wazuh-indexer/opensearch.yml &&     chown 1000:1000 /usr/share/wazuh-indexer/opensearch.yml
+USER 1000

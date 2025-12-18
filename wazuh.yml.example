@@ -1,0 +1,7 @@
+hosts:
+  - production:
+      url: https://wazuh.manager
+      port: 55000
+      username: wazuh-wui
+      password: changeme-your-password
+      run_as: false

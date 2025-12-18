@@ -1,0 +1,44 @@
+# Секреты и сертификаты
+certs/*.key
+certs/*.crt
+certs/*.pem
+nginx_conf/.htpasswd
+wazuh_certs/
+*.key
+*.crt
+*.pem
+
+# Docker volumes и данные
+wazuh-indexer-data/
+wazuh-manager-data/
+wazuh-manager-logs-data/
+wazuh-manager-etc-data/
+
+# Конфиги с секретами
+wazuh.yml
+.env
+
+# Логи
+*.log
+logs/
+
+# Временные файлы
+*.tmp
+*.swp
+*.bak
+*~
+.DS_Store
+passwords.txt
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Build artifacts
+__pycache__/
+*.pyc
+node_modules/
+
+# Git
+.git/
