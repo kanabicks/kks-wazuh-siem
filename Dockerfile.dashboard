@@ -4,15 +4,13 @@ USER root
 
 # Create default Wazuh API configuration
 RUN mkdir -p /usr/share/wazuh-dashboard/data/wazuh/config && \
-    cat > /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml << 'EOF' && \
-hosts:
-  - default:
-      url: https://wazuh.manager
-      port: 55000
-      username: wazuh-wui
-      password: wazuh-wui
-      run_as: false
-EOF
+    echo "hosts:" > /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
+    echo "  - default:" >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
+    echo "      url: https://wazuh.manager" >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
+    echo "      port: 55000" >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
+    echo "      username: wazuh-wui" >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
+    echo "      password: wazuh-wui" >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
+    echo "      run_as: false" >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml && \
     chown -R wazuh-dashboard:wazuh-dashboard /usr/share/wazuh-dashboard/data
 
 USER wazuh-dashboard
