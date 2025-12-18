@@ -60,8 +60,6 @@ services:
     environment:
       - OPENSEARCH_HOSTS=http://wazuh.indexer:9200
       - WAZUH_API_URL=https://wazuh.manager:55000
-    volumes:
-      - ./wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml:ro
     depends_on:
       - wazuh.indexer
       - wazuh.manager
