@@ -1,331 +1,608 @@
-# 🛡️ KKS Wazuh SIEM 
+# 🛡️ KKS Wazuh SIEM Lab
 
-**Полнофункциональная лаборатория для мониторинга безопасности, обнаружения угроз и проведения CTF соревнований.**
+Полнофункциональная SIEM-платформа на базе Wazuh для мониторинга безопасности, threat hunting и CTF-соревнований. Развертывается в Docker-контейнерах за 5 минут.
 
-| |/ / |/ |/ |
-| ' /| ' /| (
-| < | < __ \
-| . | . \ _) |
-||__|____/
+## 📋 Содержание
 
-Security Monitoring Lab
+- [Возможности](#возможности)
+- [Архитектура](#архитектура)
+- [Требования](#требования)
+- [Быстрый старт](#быстрый-старт)
+- [Конфигурация](#конфигурация)
+- [Использование](#использование)
+- [CTF Сценарии](#ctf-сценарии)
+- [Troubleshooting](#troubleshooting)
+- [Лицензия](#лицензия)
 
+## ✨ Возможности
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
-[![Docker](https://img.shields.io/badge/Docker-20.10%2B-blue)](https://www.docker.com/)  
-[![Wazuh](https://img.shields.io/badge/Wazuh-4.9.0-green)](https://wazuh.com/)  
-[![OpenSearch](https://img.shields.io/badge/OpenSearch-2.13.0-orange)](https://opensearch.org/)
+### Security Monitoring
+- **File Integrity Monitoring (FIM)** - отслеживание изменений критических файлов в `/etc`, `/bin`, `/sbin`.
+- **Security Configuration Assessment (SCA)** - автоматические проверки CIS Benchmark для Ubuntu 22.04.
+- **Log Analysis** - анализ syslog, auth.log, application logs с корреляцией событий.
+- **Vulnerability Detection** - сканирование установленных пакетов на известные CVE.
+- **Rootkit Detection** - поиск руткитов и скрытых процессов.
 
----
+### Threat Detection
+- Обнаружение попыток brute-force SSH/FTP.
+- Детектирование malware и вредоносных скриптов.
+- Мониторинг privilege escalation попыток.
+- Обнаружение network reconnaissance активности.
+- Алерты на подозрительные команды (sudo, whoami, netstat).
 
-## 📖 О проекте
+### CTF Features
+- Готовые сценарии для Attack-Defense соревнований.
+- Pre-configured victim node (Ubuntu 22.04) с Wazuh Agent.
+- Centralized logging и real-time alerting.
+- Dashboard для визуализации атак.
+- MITRE ATT&CK mapping для событий.
 
-**KKS SIEM Lab** — это готовая к развертыванию инфраструктура безопасности, построенная на базе современных open-source технологий. Проект рассчитан на:
+## 🏗️ Архитектура
 
-- обучение специалистов по ИБ,
-- анализ инцидентов и threat hunting,
-- моделирование атак и проведение CTF.
+┌─────────────────────┐
+│ Victim Node │
+│ (Ubuntu 22.04) │
+│ │
+│ wazuh-agentd │ ← Сбор событий
+│ wazuh-syscheckd │ ← FIM
+│ wazuh-logcollector │ ← Логи
+│ wazuh-modulesd │ ← SCA compliance
+└──────┬──────────────┘
+│ TCP 1514 (AES encrypted)
+↓
+┌─────────────────────┐
+│ Wazuh Manager │
+│ (Amazon Linux) │
+│ │
+│ wazuh-remoted │ ← Прием от агентов
+│ wazuh-analysisd │ ← Rules + Decoders
+│ wazuh-modulesd │ ← Vuln scanning
+│ wazuh-db │ ← Agent metadata
+│ wazuh-api │ ← REST API :55000
+└──────┬──────────────┘
+│ HTTPS
+↓
+┌─────────────────────┐
+│ Wazuh Indexer │
+│ (OpenSearch 2.13) │
+│ │
+│ wazuh-alerts-* │ ← Security events
+│ wazuh-monitoring-* │ ← Agent health
+│ wazuh-statistics │ ← Manager stats
+└──────┬──────────────┘
+│ HTTP :9200
+↓
+┌─────────────────────┐
+│ Wazuh Dashboard │
+│ (OpenSearch Dash) │
+│ │
+│ Security Analytics │
+│ Compliance Reports │
+│ Threat Hunting │
+└──────┬──────────────┘
+│ HTTP :5601
+↓
+┌─────────────────────┐
+│ Nginx │
+│ (Reverse Proxy) │
+│ │
+│ HTTPS :443 │
+│ Basic Auth │
+└─────────────────────┘
 
-### 🎯 Основные возможности
+text
 
-- ✅ Real-time мониторинг событий безопасности
-- ✅ File Integrity Monitoring (FIM) критичных файлов
-- ✅ Централизованный анализ логов (syslog, auth, приложения)
-- ✅ Vulnerability Detection (уязвимости, пакеты)
-- ✅ Compliance Monitoring (PCI DSS, GDPR, HIPAA, NIST, CIS)
-- ✅ MITRE ATT&CK Mapping для алертов
-- ✅ Threat Hunting и продвинутый поиск
-- ✅ Готовые security dashboards
+### Компоненты
 
----
+| Сервис          | Роль                                        | Порты        |
+|-----------------|---------------------------------------------|-------------|
+| wazuh.manager   | SIEM engine, correlation, rules processing  | 1514,1515,55000 |
+| wazuh.indexer   | Storage backend (OpenSearch)                | 9200        |
+| wazuh.dashboard | Web UI для аналитики                        | 5601        |
+| victim-node     | Агент-сенсор на защищаемом хосте            | -           |
+| nginx           | Reverse proxy + HTTPS + Basic Auth          | 443         |
+| logstash        | Alternative event pipeline (optional)       | 9600        |
 
-## 🏗️ Архитектура и технологии
+## 📦 Требования
 
-### Технологический стек
+### System Requirements
 
-| Технология           | Версия  | Назначение                                      |
-|----------------------|---------|-------------------------------------------------|
-| **Wazuh Manager**    | 4.9.0   | HIDS/SIEM, анализ событий, правила              |
-| **Wazuh Agent**      | 4.9.0   | Endpoint мониторинг (victim-node)               |
-| **OpenSearch**       | 2.13.0  | Хранение и поиск security событий               |
-| **Wazuh Dashboard**  | 4.9.0   | Веб-интерфейс (на базе OpenSearch Dashboards)   |
-| **Logstash**         | 8.9.0   | Pipeline: чтение alerts.json → индекс в OpenSearch |
-| **Nginx**            | latest  | HTTPS reverse proxy + Basic Auth                |
-| **Ubuntu**           | 22.04   | ОС для victim-node (агент)                      |
+- OS: Linux (Ubuntu 22.04 / Debian 11 / RHEL 8+ / Kali Linux).
+- RAM: минимум 8GB (16GB рекомендуется).
+- CPU: 4+ cores (8+ для больших объемов).
+- Disk: 50GB свободного места (100GB+ для длительного хранения логов).
+- Docker: 20.10+.
+- Docker Compose: 2.0+.
 
-### 🔍 Компоненты
+### Проверка системы
 
-#### Wazuh SIEM
+free -h | grep Mem
+nproc
+df -h /
+docker --version
+docker-compose --version
 
-- **Manager** — принимает события от агентов, применяет decoders и rules, генерирует алерты.
-- **Agent** — мониторит:
-  - систему (процессы, логи, rootkits),
-  - файловую систему (FIM),
-  - конфигурации (SCA, CIS benchmarks).
-- **SCA (Security Configuration Assessment)** — проверка соответствия CIS Benchmarks.
-- **Rules Engine** — корреляция событий, присвоение уровня опасности, MITRE mapping.
+text
 
-#### OpenSearch (Elasticsearch fork)
+### Установка зависимостей
 
-- Хранение всех алертов Wazuh.
-- Full-text search и агрегирования.
-- Индексы вида `wazuh-alerts-YYYY.MM.DD`.
-- Index templates для корректного mapping полей (keyword/date/ip).
+Ubuntu/Debian
 
-#### eBPF (потенциальная интеграция)
+sudo apt update
+sudo apt install -y docker.io docker-compose git apache2-utils curl
+sudo usermod -aG docker $USER
+RHEL/CentOS
 
-Текущий стек уже готов к расширению за счет eBPF:
+sudo yum install -y docker docker-compose git httpd-tools curl
+sudo systemctl enable --now docker
 
-- мониторинг системных вызовов,
-- отслеживание сетевого трафика,
-- поведенческий анализ процессов.
+docker ps
 
-#### Logstash
-
-Pipeline:
-
-Input (file: alerts.json) → Filter (date) → Output (OpenSearch + stdout)
-
-
-- `file` input: `/var/ossec/logs/alerts/alerts.json`
-- `json` codec
-- приведение `timestamp` к `@timestamp`
-- запись в индекс `wazuh-alerts-%{+YYYY.MM.dd}`
-
----
+text
 
 ## 🚀 Быстрый старт
 
-### Требования
+### 1. Клонируем репозиторий
 
-- Docker 20.10+
-- Docker Compose 2.0+
-- Linux/macOS/Windows (WSL2)
-- 4 GB RAM (минимум), 8+ GB желательно
-- 10 GB свободного места
-
-### Установка (вариант с setup.sh)
-
-
-1. Клонируем репозиторий
-
-git clone [https://github.com/kanabicks/wazuh-ebpf-kks.git](https://github.com/kanabicks/kks-wazuh-siem)
+git clone https://github.com/kanabicks/kks-wazuh-siem.git
 cd kks-wazuh-siem
-2. Делаем скрипт исполняемым и запускаем
+
+text
+
+### 2. Настраиваем окружение
+
+cp .env.example .env
+nano .env
+htpasswd -c nginx_conf/.htpasswd admin
+
+text
+
+### 3. Запускаем setup-скрипт
 
 chmod +x setup.sh
-./setup.sh
-3. Ждём 2–3 минуты до старта контейнеров и применения index template
+sudo ./setup.sh
 
+text
 
-После установки:
+Скрипт:
+- проверит системные требования,
+- сгенерирует SSL сертификаты,
+- создаст случайные пароли,
+- поднимет все контейнеры.
+
+### 4. Ждём инициализации
+
+docker-compose logs -f wazuh.manager
+docker-compose ps
+docker-compose logs wazuh.indexer | grep "started"
+
+text
+
+### 5. Доступ к интерфейсам
 
 - Dashboard: `https://localhost:443`
-- Wazuh API: `https://localhost:55000`
-- OpenSearch: `http://localhost:9200`
+- Логин: `admin`
+- Пароль: см. вывод `setup.sh` или:
 
-Логин для Dashboard: `admin`  
-Пароль: тот, который задаётся при выполнении `setup.sh` или в конфиге nginx/.htpasswd.
+cat .env | grep DASHBOARD_PASSWORD
 
-### Ручной запуск (если без setup.sh)
+text
 
-1. Сгенерировать self-signed сертификаты для Nginx (`certs/nginx.crt`, `certs/nginx.key`).
-2. Создать `nginx_conf/.htpasswd` с помощью `htpasswd`.
-3. Скопировать `wazuh.yml.example` в `wazuh.yml` и настроить креды.
-4. Запустить: docker-compose up -d
+Wazuh API (пример):
 
+curl -k -u wazuh-wui:wazuh-wui
+-X POST "https://localhost:55000/security/user/authenticate"
 
-5. Применить index template для `wazuh-alerts-*` (через Dev Tools или curl).
+text
 
----
+OpenSearch API:
 
-## 📊 Логическая схема
+curl http://localhost:9200/_cat/indices?v
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
 
-┌──────────────────────────────────────────────────────┐
-│ KKS SIEM  │
-│ │
-│ User → Nginx (443, Basic Auth) → Wazuh Dashboard │
-│ ↕ │
-│ OpenSearch Indexer │
-│ ↑ │
-│ Logstash Pipeline │
-│ ↑ │
-│ Wazuh Manager │
-│ ↑ │
-│ Wazuh Agent │
-│ (Victim Node) │
-└──────────────────────────────────────────────────────┘
+text
 
+## ⚙️ Конфигурация
 
----
+### Структура проекта
 
-## 🎯 Детекция угроз
+kks-wazuh-siem/
+├── docker-compose.yml
+├── .env
+├── .env.example
+├── setup.sh
+├── wazuh.yml.example
+├── Dockerfile.dashboard
+├── Dockerfile.indexer
+├── sensor/
+│ ├── Dockerfile
+│ └── entrypoint.sh
+├── nginx_conf/
+│ ├── default.conf
+│ └── .htpasswd.example
+└── logstash/
+└── pipeline/
+└── wazuh.conf
 
-### File Integrity Monitoring (FIM)
+text
 
-Мониторинг системных файлов:
+### .env
 
-- `/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/ssh/*`,
-- бинарники в `/usr/bin`, `/usr/sbin`,
-- опционально: `/tmp`, `/home`, `/var/www`.
+WAZUH_VERSION=4.9.0
+OPENSEARCH_VERSION=2.13.0
+LOGSTASH_VERSION=8.9.0
 
-Примеры атак:
+WAZUH_ADMIN_PASSWORD=SecurePass123!
+INDEXER_PASSWORD=SecurePass456!
+DASHBOARD_PASSWORD=SecurePass789!
 
-- добавление backdoor-пользователя в `/etc/passwd`,
-- подмена бинарника `ssh`, `sudo`,
-- создание исполняемых файлов в `/tmp`.
+NGINX_USER=admin
+NGINX_PASS=changeme
 
-Ожидаемый алерт:
+MANAGER_IP=172.18.0.5
+INDEXER_IP=172.18.0.3
 
-- Rule ID: ~550, группы: `syscheck`
-- Level: 7–12
-- MITRE: T1098 (Account Manipulation), T1499, T1204 и др.
+text
 
-### Log Analysis (auth, syslog)
+### Wazuh Manager
 
-Анализ `/var/log/auth.log`, `/var/log/syslog` на victim-node:
+docker-compose exec wazuh.manager vi /var/ossec/etc/ossec.conf
+docker-compose exec wazuh.manager vi /var/ossec/etc/rules/local_rules.xml
+docker-compose exec wazuh.manager /var/ossec/bin/wazuh-control restart
 
-- brute-force SSH (многократные failed logins),
-- успешные входы под root,
-- sudo escalation,
-- изменения пользователей и групп,
-- перезапуск критичных сервисов.
+text
 
-Пример генерации SSH brute-force:
+### Работа с агентами
+
+docker-compose exec wazuh.manager /var/ossec/bin/manage_agents
+docker-compose exec wazuh.manager /var/ossec/bin/agent_control -l
+docker-compose exec wazuh.manager /var/ossec/bin/agent_control -i 001
+
+text
+
+## 🎮 Использование
+
+### Алерты
+
+docker-compose exec wazuh.manager tail -f /var/ossec/logs/alerts/alerts.json
+docker-compose exec wazuh.manager tail -20 /var/ossec/logs/alerts/alerts.log
+
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"query": {
+"match": {
+"rule.description": "authentication"
+}
+}
+}'
+
+text
+
+### Мониторинг агентов
+
+docker-compose exec wazuh.manager /var/ossec/bin/agent_control -l
+docker-compose logs victim-node | grep "Connected to the server"
+docker-compose exec wazuh.manager /var/ossec/bin/agent_control -s
+docker-compose exec wazuh.manager /var/ossec/bin/wazuh-control status
+
+text
+
+### Аналитика
+
+docker-compose exec wazuh.manager /var/ossec/bin/wazuh-logtest
+
+echo "Dec 18 16:42:21 victim sshd: Failed password for root from 192.168.1.100" |
+docker-compose exec -T wazuh.manager /var/ossec/bin/wazuh-logtest
+
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"size": 0,
+"aggs": {
+"top_rules": {
+"terms": {
+"field": "rule.id",
+"size": 10
+}
+}
+}
+}'
+
+text
+
+## 🎯 CTF сценарии
+
+### 1. SSH Brute Force
 
 docker-compose exec victim-node bash -c '
-for i in {1..20}; do
-echo "$(date "+%b %d %H:%M:%S") victim sshd[123$i]: Failed password for invalid user hacker from 192.168.1.100 port $((20000+i)) ssh2" >> /var/log/auth.log
-sleep 0.5
+for i in {1..10}; do
+logger -p auth.warning "sshd: Failed password for invalid user hacker from 192.168.1.100 port 22 ssh2"
+sleep 1
 done
 '
 
-Ожидаемые алерты:
+sleep 15
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"query": {
+"match": {
+"rule.description": "authentication"
+}
+}
+}'
 
-- группы `authentication_failed`, `sshd`
-- MITRE: TA0006 (Credential Access), T1110 (Brute Force)
+text
 
-### Security Configuration Assessment (SCA)
+### 2. File Integrity Monitoring
 
-Автоматический аудит по:
+docker-compose exec victim-node bash -c 'echo "Test change" >> /etc/passwd'
+docker-compose exec victim-node /var/ossec/bin/wazuh-control restart
 
-- CIS Ubuntu 22.04 Benchmark (логин-политики, права, auditd),
-- CIS Amazon Linux 2023 (если задействован),
-- парольные политики,
-- настройки логирования,
-- права файлов и директорий.
+sleep 20
+curl "http://localhost:9200/wazuh-alerts-*/_search?pretty=size=3&sort=timestamp:desc" |
+grep -A 20 "Integrity checksum changed"
 
-Результат — score и подробные алерты с remediation.
+text
 
----
-
-## 🧪 CTF-сценарии (примеры)
-
-### 1️⃣ SSH Brute-Force
-
-Симулируем атаку (см. выше), затем:
-
-- Заходим в Dashboard → Threat Hunting.
-- KQL фильтр: rule.groups: "authentication_failed" OR rule.description: sshd
-
-- Анализируем chain событий, MITRE карту.
-
-### 2️⃣ Подмена /etc/passwd
-
-docker-compose exec victim-node bash -c
-"echo 'backdoor:x:0:0:Backdoor:/root:/bin/bash' >> /etc/passwd"
-
-Ищем:
-
-- File Integrity Monitoring → Recent Events,
-- или Discover:
-
-syscheck.path: "/etc/passwd"
-
-### 3️⃣ Malware Dropper в /tmp
+### 3. Malware Detection
 
 docker-compose exec victim-node bash -c '
-touch /tmp/malware_$(date +%s).elf
-chmod +x /tmp/malware_*.elf
+touch /tmp/malware.php
+echo "<?php system(\$_GET[\"cmd\"]); ?>" > /tmp/malware.php
 '
 
+sleep 20
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"query": {
+"match": {
+"data.file": "malware"
+}
+}
+}'
 
-Ищем:
+text
 
-- FIM по `/tmp`,
-- кастомные правила на имена файлов (`malware`, `backdoor`, `miner`).
+### 4. Privilege Escalation
 
----
+docker-compose exec victim-node bash -c '
+logger -p auth.info "sudo: testuser : TTY=pts/0 ; PWD=/home/testuser ; USER=root ; COMMAND=/bin/bash"
+'
 
-## 📈 Web-интерфейс: основные разделы
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"query": {
+"match": {
+"rule.mitre.tactic": "Privilege Escalation"
+}
+}
+}'
 
-- **Threat Hunting** — поиск и анализ алертов (основной инструмент).
-- **File Integrity Monitoring** — все изменения файлов.
-- **Configuration Assessment** — результаты CIS benchmarks.
-- **MITRE ATT&CK** — отображение алертов по тактикам/техникам.
-- **Vulnerability Detection** — уязвимости пакетов.
-- **Discover** — сырые документы, мощный фулл-текст поиск.
+text
 
-Примеры KQL:
+### 5. CIS Compliance
 
+docker-compose exec victim-node /var/ossec/bin/wazuh-control restart
 
-Критичные алерты за последние 24ч
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"query": {
+"match": {
+"data.sca.policy": "CIS Ubuntu"
+}
+},
+"size": 5
+}'
 
-rule.level >= 10 and @timestamp >= now-24h
-Атаки на конкретный хост
+text
 
-agent.name: "12b69a55444d" and rule.level >= 7
-MITRE Persistence
+## 🔧 Troubleshooting
 
-rule.mitre.tactic: "TA0003"
-FIM изменения в /etc
+### Permission denied в wazuh.manager
 
-syscheck.path: "/etc/*"
+Добавь privileged: true
 
+grep -A 5 "wazuh.manager:" docker-compose.yml
 
----
+docker-compose down
+docker-compose up -d wazuh.manager
 
-## 🔧 Кастомизация
+text
 
-### Локальные правила (local_rules.xml)
+### Connection refused к wazuh.indexer
 
-Пример кастомного правила:
+docker-compose ps wazuh.indexer
+docker-compose logs wazuh.indexer | grep "started"
+curl http://localhost:9200/_cluster/health?pretty
+docker-compose restart wazuh.indexer
 
-<group name="kks_custom,syslog,sshd"> <rule id="100001" level="10"> <if_sid>5710</if_sid> <description>KKS: Multiple SSH failures detected</description> <mitre> <id>T1110</id> </mitre> </rule> </group> ```
-Расширение FIM
+text
 
-В agent.conf (shared config):
+### Агент не подключается
 
-<agent_config>
-  <syscheck>
-    <directories check_all="yes" realtime="yes">/tmp</directories>
-    <directories check_all="yes" realtime="yes">/home</directories>
-    <alert_new_files>yes</alert_new_files>
-  </syscheck>
-</agent_config>
+docker-compose exec victim-node ping -c 3 wazuh.manager
+docker-compose exec wazuh.manager netstat -tulnp | grep -E "1514|1515"
+docker-compose exec victim-node cat /var/ossec/etc/client.keys
+docker-compose restart victim-node
+docker-compose logs wazuh.manager | grep "Agent connected"
 
+text
 
-🐛 Troubleshooting (кратко)
+### Не пускает в Dashboard
 
-    Нет алертов в Dashboard:
+cat .env | grep PASSWORD
 
-        проверить wazuh-alerts-* индексы в OpenSearch,
+docker-compose exec wazuh.indexer
+/usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh
+-cd /usr/share/wazuh-indexer/opensearch-security/
+-nhnv -cacert /etc/wazuh-indexer/certs/root-ca.pem
+-cert /etc/wazuh-indexer/certs/admin.pem
+-key /etc/wazuh-indexer/certs/admin-key.pem
 
-        проверить логи Logstash и права на /var/ossec/logs/alerts/alerts.json.
+text
 
-    Агент не подключается:
+### Высокая нагрузка
 
-        agent_control -l на Manager,
+docker stats
+В docker-compose.yml:
+OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
 
-        логи агента на victim-node (/var/ossec/logs/ossec.log).
+curl -X PUT "http://localhost:9200/_ilm/policy/wazuh-alerts-policy"
+-H 'Content-Type: application/json' -d '
+{
+"policy": {
+"phases": {
+"delete": {
+"min_age": "7d",
+"actions": {
+"delete": {}
+}
+}
+}
+}
+}'
 
-    Ошибки по mapping в Dashboard:
+curl -X DELETE "http://localhost:9200/wazuh-alerts-2025.12.*"
 
-        пересоздать index template с keyword/date/ip,
+docker-compose exec wazuh.manager vi /var/ossec/etc/ossec.conf
+<frequency>86400</frequency>
 
-        удалить старые индексы, перезапустить Logstash.
+text
 
+### Nginx 502
 
+docker-compose ps wazuh.dashboard
+docker-compose logs wazuh.dashboard | tail -50
+docker-compose exec nginx ping -c 3 wazuh.dashboard
+docker-compose restart nginx
+docker-compose exec nginx nginx -t
 
+text
 
-Made with ❤️ for cybersecurity education.
+### Мало места
+
+docker system df -v
+docker system prune -af --volumes
+
+curl -X DELETE "http://localhost:9200/wazuh-alerts-*"
+
+docker-compose exec wazuh.manager vi /var/ossec/etc/ossec.conf
+docker-compose exec wazuh.manager rm -f /var/ossec/logs/alerts/alerts.log.*
+
+text
+
+## 🛠️ Полезные команды
+
+### Docker
+
+docker-compose down
+docker-compose down -v
+docker-compose restart wazuh.manager
+docker-compose build --no-cache
+docker-compose logs -f
+docker-compose logs -f wazuh.manager --tail=100
+docker-compose exec wazuh.manager bash
+docker-compose exec victim-node bash
+docker stats
+
+text
+
+### Backup
+
+docker run --rm
+-v kks-wazuh-siem_wazuh-data:/data
+-v $(pwd):/backup ubuntu
+tar czf /backup/wazuh-backup.tar.gz /data
+
+text
+
+### Wazuh API
+
+TOKEN=$(curl -k -u wazuh-wui:wazuh-wui -X POST
+"https://localhost:55000/security/user/authenticate" | jq -r '.data.token')
+
+curl -k -H "Authorization: Bearer $TOKEN"
+"https://localhost:55000/agents?pretty=true"
+
+curl -k -H "Authorization: Bearer $TOKEN"
+"https://localhost:55000/agents/002?pretty=true"
+
+curl -k -H "Authorization: Bearer $TOKEN" -X PUT
+"https://localhost:55000/agents/002/restart?pretty=true"
+
+curl -k -H "Authorization: Bearer $TOKEN"
+"https://localhost:55000/manager/stats?pretty=true"
+
+curl -k -H "Authorization: Bearer $TOKEN"
+"https://localhost:55000/rules?pretty=true&limit=10"
+
+text
+
+### OpenSearch
+
+curl http://localhost:9200/_cat/indices?v
+curl http://localhost:9200/wazuh-alerts-*/_mapping?pretty
+curl http://localhost:9200/wazuh-alerts-$(date +%Y.%m.%d)/_count?pretty
+
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"size": 0,
+"aggs": {
+"top_agents": {
+"terms": {
+"field": "agent.name",
+"size": 5
+}
+}
+}
+}'
+
+curl http://localhost:9200/wazuh-alerts-*/_search?pretty
+-H 'Content-Type: application/json' -d '
+{
+"query": {
+"range": {
+"rule.level": {
+"gte": 10
+}
+}
+}
+}'
+
+text
+
+## 🤝 Contributing
+
+Форк репозитория
+
+git clone https://github.com/YOUR_USERNAME/kks-wazuh-siem.git
+cd kks-wazuh-siem
+Создание feature branch
+
+git checkout -b feature/amazing-feature
+Внесение изменений и тестирование
+
+docker-compose down && docker-compose up -d
+Commit изменений
+
+git commit -m "Add amazing feature"
+Push и PR
+
+git push origin feature/amazing-feature
+
+text
+
+## 📄 Лицензия
+
+Проект распространяется под лицензией MIT (см. LICENSE).
+
+## 👨‍💻 Автор
+
+KKS Security Lab  
+GitHub: https://github.com/kanabicks    
